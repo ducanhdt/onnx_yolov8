@@ -10,7 +10,10 @@ This code can run YOLOv8 for object detection in an ONNX environment without req
 ```shell
 pip install -r requirements.txt
 ```
-
+You could install opencv-python for visualization
+```shell
+pip install opencv-python
+```
 You can convert the model using the following code after installing ultralitics (`pip install ultralytics`):
 ```python
 from ultralytics import YOLO

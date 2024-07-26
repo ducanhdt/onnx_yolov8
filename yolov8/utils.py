@@ -1,5 +1,4 @@
 import numpy as np
-import cv2
 
 class_names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
                'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
@@ -81,61 +80,6 @@ def xywh2xyxy(x):
     y[..., 2] = x[..., 0] + x[..., 2] / 2
     y[..., 3] = x[..., 1] + x[..., 3] / 2
     return y
-
-
-def draw_detections(image, boxes, scores, class_ids, mask_alpha=0.3):
-    det_img = image.copy()
-
-    img_height, img_width = image.shape[:2]
-    font_size = min([img_height, img_width]) * 0.0006
-    text_thickness = int(min([img_height, img_width]) * 0.001)
-
-    det_img = draw_masks(det_img, boxes, class_ids, mask_alpha)
-
-    # Draw bounding boxes and labels of detections
-    for class_id, box, score in zip(class_ids, boxes, scores):
-        color = colors[class_id]
-
-        draw_box(det_img, box, color)
-
-        label = class_names[class_id]
-        caption = f'{label} {int(score * 100)}%'
-        draw_text(det_img, caption, box, color, font_size, text_thickness)
-
-    return det_img
-
-
-def draw_box( image: np.ndarray, box: np.ndarray, color: tuple[int, int, int] = (0, 0, 255),
-             thickness: int = 2) -> np.ndarray:
-    x1, y1, x2, y2 = box.astype(int)
-    return cv2.rectangle(image, (x1, y1), (x2, y2), color, thickness)
-
-
-def draw_text(image: np.ndarray, text: str, box: np.ndarray, color: tuple[int, int, int] = (0, 0, 255),
-              font_size: float = 0.001, text_thickness: int = 2) -> np.ndarray:
-    x1, y1, x2, y2 = box.astype(int)
-    (tw, th), _ = cv2.getTextSize(text=text, fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                                  fontScale=font_size, thickness=text_thickness)
-    th = int(th * 1.2)
-
-    cv2.rectangle(image, (x1, y1),
-                  (x1 + tw, y1 - th), color, -1)
-
-    return cv2.putText(image, text, (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, font_size, (255, 255, 255), text_thickness, cv2.LINE_AA)
-
-def draw_masks(image: np.ndarray, boxes: np.ndarray, classes: np.ndarray, mask_alpha: float = 0.3) -> np.ndarray:
-    mask_img = image.copy()
-
-    # Draw bounding boxes and labels of detections
-    for box, class_id in zip(boxes, classes):
-        color = colors[class_id]
-
-        x1, y1, x2, y2 = box.astype(int)
-
-        # Draw fill rectangle in mask image
-        cv2.rectangle(mask_img, (x1, y1), (x2, y2), color, -1)
-
-    return cv2.addWeighted(mask_img, mask_alpha, image, 1 - mask_alpha, 0)
 
 
 
@@ -246,14 +190,18 @@ class LetterBox:
         if self.center:
             dw /= 2  # divide padding into 2 sides
             dh /= 2
-
+        from PIL import Image
         if shape[::-1] != new_unpad:  # resize
-            img = cv2.resize(img, new_unpad, interpolation=cv2.INTER_LINEAR)
+            img = np.array(Image.fromarray(img).resize(new_unpad))  
+            
         top, bottom = int(round(dh - 0.1)) if self.center else 0, int(round(dh + 0.1))
         left, right = int(round(dw - 0.1)) if self.center else 0, int(round(dw + 0.1))
-        img = cv2.copyMakeBorder(
-            img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(114, 114, 114)
-        )  # add border
+
+        pad_width = ((top, bottom), (left, right), (0, 0))
+        constant_values = ((114, 114), (114, 114), (114, 114))
+        img = np.pad(img, pad_width=pad_width, mode='constant', constant_values=constant_values)
+
+        
         if labels.get("ratio_pad"):
             labels["ratio_pad"] = (labels["ratio_pad"], (left, top))  # for evaluation
 
@@ -308,3 +256,19 @@ def pre_transform(im):
     letterbox = LetterBox([640, 640], auto=False, stride=0)
     # return [letterbox(image=x) for x in im]
     return letterbox(image=im)
+
+def clip_boxes(boxes, shape):
+    """
+    Takes a list of bounding boxes and a shape (height, width) and clips the bounding boxes to the shape.
+
+    Args:
+        boxes (torch.Tensor): the bounding boxes to clip
+        shape (tuple): the shape of the image
+
+    Returns:
+        (torch.Tensor | numpy.ndarray): Clipped boxes
+    """
+ 
+    boxes[..., [0, 2]] = boxes[..., [0, 2]].clip(0, shape[1])  # x1, x2
+    boxes[..., [1, 3]] = boxes[..., [1, 3]].clip(0, shape[0])  # y1, y2
+    return boxes

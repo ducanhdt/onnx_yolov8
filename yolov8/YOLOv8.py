@@ -1,24 +1,9 @@
 import time
-import cv2
 import numpy as np
 import onnxruntime
 
-from yolov8.utils import xywh2xyxy, draw_detections, multiclass_nms, pre_transform
-def clip_boxes(boxes, shape):
-    """
-    Takes a list of bounding boxes and a shape (height, width) and clips the bounding boxes to the shape.
+from yolov8.utils import xywh2xyxy, multiclass_nms, pre_transform, clip_boxes
 
-    Args:
-        boxes (torch.Tensor): the bounding boxes to clip
-        shape (tuple): the shape of the image
-
-    Returns:
-        (torch.Tensor | numpy.ndarray): Clipped boxes
-    """
- 
-    boxes[..., [0, 2]] = boxes[..., [0, 2]].clip(0, shape[1])  # x1, x2
-    boxes[..., [1, 3]] = boxes[..., [1, 3]].clip(0, shape[0])  # y1, y2
-    return boxes
 
 class YOLOv8:
 
@@ -152,10 +137,6 @@ class YOLOv8:
         boxes[..., :4] /= gain
         return clip_boxes(boxes, img0_shape)
 
-    def draw_detections(self, image, draw_scores=True, mask_alpha=0.4):
-
-        return draw_detections(image, self.boxes, self.scores,
-                               self.class_ids, mask_alpha)
 
     def get_input_details(self):
         model_inputs = self.session.get_inputs()
@@ -168,24 +149,3 @@ class YOLOv8:
     def get_output_details(self):
         model_outputs = self.session.get_outputs()
         self.output_names = [model_outputs[i].name for i in range(len(model_outputs))]
-
-
-if __name__ == '__main__':
-    from imread_from_url import imread_from_url
-
-    model_path = "../models/yolov8m.onnx"
-
-    # Initialize YOLOv8 object detector
-    yolov8_detector = YOLOv8(model_path, conf_thres=0.3, iou_thres=0.5)
-
-    img_url = "https://live.staticflickr.com/13/19041780_d6fd803de0_3k.jpg"
-    img = imread_from_url(img_url)
-
-    # Detect Objects
-    yolov8_detector(img)
-
-    # Draw detections
-    combined_img = yolov8_detector.draw_detections(img)
-    cv2.namedWindow("Output", cv2.WINDOW_NORMAL)
-    cv2.imshow("Output", combined_img)
-    cv2.waitKey(0)
